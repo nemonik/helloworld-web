@@ -1,0 +1,72 @@
+pipeline:
+  build:
+    image: 192.168.0.11:5000/nemonik/golang:1.10.1
+    commands:
+      - make lint
+      - make test
+      - make build
+
+  sonarqube:
+    image: 192.168.0.11:5000/nemonik/golang-sonarqube-scanner:3.1.0.1141
+    commands:
+      - export DRONESRC=`pwd`
+      - export GOBIN=$GOPATH/bin
+      - mkdir -p $GOPATH/src/github.com/nemonik
+      - cd $GOPATH/src/github.com/nemonik
+      - ln -s $DRONESRC helloworld-web
+      - gometalinter --install
+      - gometalinter --deadline=120s --checkstyle > report.xml || true
+      - gocov test ./... | gocov-xml || true
+      - go test  -v ./... | go-junit-report > test.xml || true
+      - sonar-scanner -X -D http.nonProxyHosts=$NO_PROXY -D http.proxyHost=$HTTP_PROXY -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.coverage.dtdVerification=false -D sonar.sources=. -D sonar.golint.reportPath=report.xml -D sonar.coverage.reportPath=coverage.xml -D sonar.coverage.dtdVerification=false -D sonar.test.reportPath=test.xml -D sonar.exclusions=**/*test.go || true
+
+  publish:
+    image: plugins/docker
+    storage_driver: overlay
+    insecure: true
+    registry: 192.168.0.11:5000
+    repo: 192.168.0.11:5000/nemonik/helloworld-web
+    force_tag: true
+    tags: [ latest ]
+    custom_dns: ["128.29.154.114", "129.83.20.114"]
+    when:
+      branch: master
+
+  deploy:
+    image: appleboy/drone-ssh
+    host: 192.168.0.11
+    port: 22
+    username: vagrant
+    volumes:
+      - /vagrant/.vagrant/machines/toolchain/virtualbox/private_key:/root/ssh/drone_rsa
+    key_path: /root/ssh/drone_rsa
+    command_timeout: 360
+    script:
+      - docker stop helloworld-web 2>/dev/null
+      - docker rm helloworld-web 2>/dev/null
+      - docker rmi 192.168.0.11:5000/nemonik/helloworld-web 2>/dev/null
+      - docker run -d --restart=always --name helloworld-web --publish 3000:3000 192.168.0.11:5000/nemonik/helloworld-web
+    when:
+      branch: master
+
+  selenium:
+    image: 192.168.0.11:5000/nemonik/python:2.7.14
+    commands:
+      - export NO_PROXY=$NO_PROXY,$(python selenium-test/resolve.py firefox)
+      - export no_proxy=$no_proxy,$(python selenium-test/resolve.py firefox)
+      - cd selenium-test
+      - pip install -r requirements.txt
+      - python test_hello_world.py firefox http://192.168.0.11:3000
+
+  owasp-zaproxy:
+    image: 192.168.0.11:5000/nemonik/zap2docker-stable:2.7.0
+    commands:
+      - zap-baseline.py -t http://192.168.0.11:3000 || true
+
+services:
+  firefox:
+    image: 192.168.0.11:5000/nemonik/standalone-firefox:3.11
+    volumes:
+      - /dev/shm:/dev/shm
+    ports:
+      - "4444:4444"
