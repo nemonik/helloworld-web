@@ -40,7 +40,6 @@ sonar: test
 build:
         $(GOBUILD) -o $(BINARY_NAME) -v
 run: build      
-        $(GOBUILD) -o $(BINARY_NAME) -v ./...
         ./$(BINARY_NAME)
 docker-build: build
         docker build --no-cache -t nemonik/helloworld-web .
