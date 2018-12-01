@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  helloworld:
+    build: .
+    image: nemonik/helloworld-web:latest
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 4M
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "3000:3000"
+    networks:
+      - web
+networks:
+  web:
