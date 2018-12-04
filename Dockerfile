@@ -8,6 +8,6 @@ WORKDIR /app
 
 RUN go build -o helloworld-web .
 
-CMD ["/app/helloworld-web"
+CMD ["/app/helloworld-web"]
 
 EXPOSE 3000
