@@ -10,42 +10,39 @@ GOFMT=$(GOCMD) fmt
 GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
+GOLINT=$(GOCMD)lint
 GOGET=$(GOCMD) get
 BINARY_NAME=helloworld-web
-HTTP_PROXY=${http_proxy}
-NO_PROXY=${no_proxy}
 
 SONAR_DEPENDENCIES := \
-	github.com/alecthomas/gometalinter \
-	github.com/axw/gocov/... \
-	github.com/AlekSi/gocov-xml \
-	github.com/jstemmer/go-junit-report
+	gopkg.in/alecthomas/gometalinter.v2
 
-all: fmt lint test build
+all: sonar docker-push
+
 clean:
 	$(GOCLEAN)
 	rm -f $(BINARY_NAME)
 fmt:
 	$(GOFMT)
-lint:
+lint: fmt
 	$(GOGET) github.com/golang/lint/golint
 	golint
-test:
-	$(GOTEST) -v ./...
+test: lint
+	$(GOTEST) -v -cover ./...
+sonar: test
+	$(GOGET) -u $(SONAR_DEPENDENCIES)
+	-gometalinter.v2 --install
+	-gometalinter.v2 > gometalinter-report.out
+	-$(GOLINT) > golint-report.out
+	-$(GOTEST) -v ./... -coverprofile=coverage.out
+	-$(GOTEST) -v ./... -json > report.json
+	-sonar-scanner -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go
 build:
 	$(GOBUILD) -o $(BINARY_NAME) -v
-run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./...
+run:      
 	./$(BINARY_NAME)
-sonar:
-	$(GOGET) $(SONAR_DEPENDENCIES)
-	gometalinter --install
-	-gometalinter --checkstyle > report.xml
-	-gocov test ./... | gocov-xml > coverage.xml
-	-$(GOTEST) -v ./... | go-junit-report > test.xml
-	sonar-scanner -X -D http.nonProxyHosts=$(NO_PROXY) -D http.proxyHost=$(HTTP_PROXY) -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.coverage.dtdVerification=false -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.golint.reportPath=report.xml -D sonar.coverage.reportPath=coverage.xml -D sonar.coverage.dtdVerification=false -D sonar.test.reportPath=test.xml  -D sonar.exclusions=**/*test.go
-docker-build:
+docker-build: build
 	docker build --no-cache -t nemonik/helloworld-web .
-docker-push:
+docker-push: docker-build
 	docker tag nemonik/helloworld-web 192.168.0.11:5000/nemonik/helloworld-web
 	docker push 192.168.0.11:5000/nemonik/helloworld-web
