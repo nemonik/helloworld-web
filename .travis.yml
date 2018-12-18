@@ -5,3 +5,6 @@ go:
 
 notifications:
   email: false
+
+services:
+  - docker
