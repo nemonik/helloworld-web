@@ -1,87 +1,105 @@
-pipeline:
-  sonarqube:
-    image: 192.168.0.11:5000/nemonik/golang-sonarqube-scanner:3.2.0.1227
-    commands:
-      - export DRONESRC=`pwd`
-      - export GOBIN=$GOPATH/bin
-      - mkdir -p $GOPATH/src/github.com/nemonik
-      - cd $GOPATH/src/github.com/nemonik
-      - ln -s $DRONESRC helloworld-web
-      - cd helloworld-web
-      - go get -u golang.org/x/lint/golint
-      - go get -u gopkg.in/alecthomas/gometalinter.v2
-      - gometalinter.v2 --install
-      - gometalinter.v2 --deadline=120s --checkstyle > gometalinter-report.out || true
-      - go lint > golint-report.out || true
-      - go test -v ./... -coverprofile=coverage.out || true
-      - go test -v ./... -json > report.json || true
-      - sonar-scanner -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go || true
-  build:
-    image: nemonik/golang:1.11.2
-    commands:
-      - make build
-    when:
-      branch: master
-  publish:
-    image: plugins/docker
+kind: pipeline
+name: default
+
+steps:
+- name: sonarqube
+  image: 192.168.0.11:5000/nemonik/golang-sonarqube-scanner:3.3.0.1492
+  commands:
+  - export DRONESRC=`pwd`
+  - export GOBIN=$GOPATH/bin
+  - mkdir -p $GOPATH/src/github.com/nemonik
+  - cd $GOPATH/src/github.com/nemonik
+  - ln -s $DRONESRC helloworld-web
+  - cd helloworld-web
+  - go get -u golang.org/x/lint/golint
+  - go get -u gopkg.in/alecthomas/gometalinter.v2
+  - gometalinter.v2 --install
+  - gometalinter.v2 --deadline=120s --checkstyle > gometalinter-report.out || true
+  - go lint > golint-report.out || true
+  - go test -v ./... -coverprofile=coverage.out || true
+  - go test -v ./... -json > report.json || true
+  - sonar-scanner -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go || true
+
+- name: build
+  image: nemonik/golang:1.12.1
+  commands:
+  - make build
+
+- name: publish
+  image: plugins/docker
+  settings:
     storage_driver: overlay
     insecure: true
     registry: 192.168.0.11:5000
     repo: 192.168.0.11:5000/nemonik/helloworld-web
     force_tag: true
-    tags: [ latest ]
-    custom_dns: ["10.20.100.53", "10.20.200.53"]
-    when:
-      branch: master
-  deploy:
-    image: appleboy/drone-ssh
+    tags:
+    - latest
+    custom_dns:
+    - "10.20.100.53"
+    - "10.20.200.53"
+
+- name: deploy
+  image: appleboy/drone-ssh
+  volumes:
+  - name: private_key
+    path: /root/ssh/drone_rsa
+  settings:
     host: 192.168.0.11
     port: 22
     username: vagrant
-    volumes:
-      - /vagrant/.vagrant/machines/toolchain/virtualbox/private_key:/root/ssh/drone_rsa
     key_path: /root/ssh/drone_rsa
-    command_timeout: 360
+    command_timeout: 3m
     script:
       - docker stop helloworld-web 2>/dev/null
       - docker rm helloworld-web 2>/dev/null
       - docker rmi 192.168.0.11:5000/nemonik/helloworld-web 2>/dev/null
       - docker run -d --restart=always --name helloworld-web --publish 3000:3000 192.168.0.11:5000/nemonik/helloworld-web
-    when:
-      branch: master
-  inspec:
-    image: appleboy/drone-ssh
+
+- name: inspec
+  image: appleboy/drone-ssh
+  volumes:
+  - name: private_key
+    path: /root/ssh/drone_rsa
+  settings:
     host: 192.168.0.11
     port: 22
     username: vagrant
-    volumes:
-      - /vagrant/.vagrant/machines/toolchain/virtualbox/private_key:/root/ssh/drone_rsa
     key_path: /root/ssh/drone_rsa
-    command_timeout: 360
+    command_timeout: 3m
     script:
       - cd /tmp
-      - rm inspec.rb
+      - rm inspec.*
       - wget http://192.168.0.11:10080/root/helloworld-web/raw/master/inspec-tests/inspec.rb
+      - wget http://192.168.0.11:10080/root/helloworld-web/raw/master/inspec-tests/inspec.yml
       - inspec exec inspec.rb
-    when:
-      branch: master
-  selenium:
-    image: 192.168.0.11:5000/nemonik/python:2.7.15
-    commands:
-      - export NO_PROXY=$NO_PROXY,$(python selenium-test/resolve.py firefox)
-      - export no_proxy=$no_proxy,$(python selenium-test/resolve.py firefox)
-      - cd selenium-test
-      - pip install -r requirements.txt
-      - python test_helloworld.py firefox http://192.168.0.11:3000
-  owasp-zaproxy:
-    image: 192.168.0.11:5000/nemonik/zap2docker-stable:2.7.0
-    commands:
-      - zap-baseline.py -t http://192.168.0.11:3000 || true
+
+- name: selenium
+  image: 192.168.0.11:5000/nemonik/python:2.7.16
+  commands:
+  - export NO_PROXY=$NO_PROXY,$(python selenium-test/resolve.py firefox)
+  - export no_proxy=$no_proxy,$(python selenium-test/resolve.py firefox)
+  - cd selenium-test
+  - pip install -r requirements.txt
+  - python test_helloworld.py firefox http://192.168.0.11:3000
+
+- name: owasp-zaproxy
+  image: 192.168.0.11:5000/nemonik/zap2docker-stable:2.7.0
+  commands:
+  - zap-baseline.py -t http://192.168.0.11:3000 || true
+
+volumes:
+- name: private_key
+  host:
+    path: /vagrant/.vagrant/machines/toolchain/virtualbox/private_key
+- name: shared_memory
+  host:
+    path: /dev/shm
 
 services:
-  firefox:
-    image: 192.168.0.11:5000/nemonik/standalone-firefox:3.14.0
-    volumes:
-      - /dev/shm:/dev/shm
-    ports:
-      - "4444:4444"
+- name: firefox
+  image: 192.168.0.11:5000/nemonik/standalone-firefox:3.14.0
+  volumes:
+  - name: shared_memory
+    path: /dev/shm
+
