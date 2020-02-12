@@ -1,8 +1,13 @@
 # OS-specific
 .DS_Store
 
-*.xml
-
-helloworld-web
-
+# reports
 .scannerwork
+coverage.out
+golint-report.out
+gometalinter-report.out
+report.json
+inspec_helloworld.json
+
+# binary
+helloworld-web

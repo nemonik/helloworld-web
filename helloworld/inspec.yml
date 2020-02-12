@@ -1,0 +1,10 @@
+name: helloworld-tests
+title: InSpec Profile
+maintainer: Michael Joseph Walsh
+copyright: Michael Joseph Walsh
+copyright_email: walsh@nemonik.comm
+license: New BSD License
+summary: A minimal InSpec Compliance Profile for helloworld-web
+version: 0.0.1
+supports:
+  platform: os

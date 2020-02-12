@@ -2,17 +2,21 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 )
 
 func main() {
 	http.HandleFunc("/", handler)
 	fmt.Print("listening on :3000\n")
-	http.ListenAndServe(":3000", logRequest(http.DefaultServeMux))
+	log.Fatal(http.ListenAndServe(":3000", logRequest(http.DefaultServeMux)))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello world!")
+	_, err := fmt.Fprintf(w, "Hello world!\n")
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func logRequest(handler http.Handler) http.Handler {

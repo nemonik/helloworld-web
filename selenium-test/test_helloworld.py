@@ -1,4 +1,4 @@
-# Copyright (C) 2018 Michael Joseph Walsh - All Rights Reserved
+# Copyright (C) 2019 Michael Joseph Walsh - All Rights Reserved
 # You may use, distribute and modify this code under the
 # terms of the the license.
 #
@@ -11,7 +11,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import sys
 import os
 
-class PythonOrgSearch(unittest.TestCase):
+class HelloworldWebTest(unittest.TestCase):
 
     def setUp(self):
 
@@ -40,3 +40,4 @@ if __name__ == "__main__":
 
     del sys.argv[1:]
     unittest.main()
+
