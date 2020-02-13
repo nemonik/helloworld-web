@@ -28,7 +28,7 @@ sonar: test
 	-$(GOLINT) > golint-report.out
 	-$(GOTEST) -v ./... -coverprofile=coverage.out
 	-$(GOTEST) -v ./... -json > report.json
-	-sonar-scanner -D sonar.host.url=http://192.168.0.205:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go
+	-sonar-scanner -D sonar.host.url=http://192.168.0.205:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=main.go -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go
 build:
 	$(GOBUILD) -o $(BINARY_NAME) -v
 run:
