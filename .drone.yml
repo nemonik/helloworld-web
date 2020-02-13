@@ -3,7 +3,7 @@ name: default
 
 steps:
 - name: sonarqube
-  image: 192.168.0.11:5000/nemonik/golang-sonarqube-scanner:4.0.0.1744
+  image: 192.168.0.201:5000/nemonik/golang-sonarqube-scanner:4.0.0.1744
   commands:
   - export DRONESRC=`pwd`
   - export GOBIN=$GOPATH/bin
@@ -11,72 +11,77 @@ steps:
   - cd $GOPATH/src/github.com/nemonik
   - ln -s $DRONESRC helloworld-web
   - cd helloworld-web
-  - go get -u golang.org/x/lint/golint
-  - go get -u gopkg.in/alecthomas/gometalinter.v2
   - gometalinter.v2 --install
   - gometalinter.v2 --deadline=120s --checkstyle > gometalinter-report.out || true
-  - go lint > golint-report.out || true
+  - golint > golint-report.out || true
   - go test -v ./... -coverprofile=coverage.out || true
   - go test -v ./... -json > report.json || true
-  - sonar-scanner -D sonar.host.url=http://192.168.0.11:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go || true
+  - sonar-scanner -D sonar.host.url=http://192.168.0.205:9000 -D sonar.projectKey=helloworld-web -D sonar.projectName=helloworld-web -D sonar.projectVersion=1.0 -D sonar.sources=. -D sonar.go.gometalinter.reportPaths=gometalinter-report.out -D sonar.go.golint.reportPaths=golint-report.out -D sonar.go.coverage.reportPaths=coverage.out -D sonar.go.tests.reportPaths=report.json -D sonar.exclusions=**/*test.go || true
+
 - name: build
-  image: nemonik/golang:1.13
+  image: 192.168.0.201:5000/nemonik/golang:1.13.7
   commands:
   - make build
+
 - name: publish
   image: plugins/docker
   settings:
     storage_driver: overlay
     insecure: true
-    registry: 192.168.0.11:5000
-    repo: 192.168.0.11:5000/nemonik/helloworld-web
+    registry: 192.168.0.201:5000
+    repo: 192.168.0.201:5000/nemonik/helloworld-web
     force_tag: true
     tags:
     - latest
+
 - name: deploy
   image: appleboy/drone-ssh
   settings:
     key:
       from_secret: insecure_private_key
-    host: 192.168.0.11
+    host: 192.168.0.10
     port: 22
     username: vagrant
     command_timeout: 5m
     script:
     - docker stop helloworld-web 2>/dev/null
     - docker rm helloworld-web 2>/dev/null
-    - docker rmi 192.168.0.11:5000/nemonik/helloworld-web 2>/dev/null
-    - docker run -d --restart=always --name helloworld-web --publish 3000:3000 192.168.0.11:5000/nemonik/helloworld-web
+    - docker rmi 192.168.0.201:5000/nemonik/helloworld-web 2>/dev/null
+    - docker run -d --restart=always --name helloworld-web --publish 3000:3000 192.168.0.201:5000/nemonik/helloworld-web
+
 - name: inspec
   image: appleboy/drone-ssh
   settings:
     key:
       from_secret: insecure_private_key
-    host: 192.168.0.11
+    host: 192.168.0.10
     port: 22
     username: vagrant
     command_timeout: 5m
     script:
-      - cd /tmp
-      - WORK_DIR=`mktemp -d -p "$DIR"`
+      - source /etc/profile
+      - WORK_DIR=`mktemp -d`
       - cd $WORK_DIR
-      - git clone http://192.168.0.11:10080/root/helloworld-web.git
+      - git clone http://192.168.0.202/root/helloworld-web.git
       - cd helloworld-web
       - inspec exec --chef-license=accept-silent helloworld
       - cd ..
       - rm -Rf $WORK_DIR
+
 - name: selenium
-  image: 192.168.0.11:5000/nemonik/python:2.7.16
+  image: 192.168.0.201:5000/nemonik/python:2.7.17
   commands:
   - export NO_PROXY=$NO_PROXY,$(python selenium-test/resolve.py firefox)
   - export no_proxy=$no_proxy,$(python selenium-test/resolve.py firefox)
   - cd selenium-test
-  - pip install -r requirements.txt
-  - python test_helloworld.py firefox http://192.168.0.11:3000
+  - python -m pip install -r requirements.txt
+  - python test_helloworld.py firefox http://192.168.0.10:3000
+
 - name: owasp-zaproxy
-  image: 192.168.0.11:5000/nemonik/zap2docker-stable:2.8.0
+  image: 192.168.0.201:5000/nemonik/zap2docker-stable:2.8.0
   commands:
-  - zap-baseline.py -t http://192.168.0.11:3000 || true
+  - zap-baseline.py -t http://192.168.0.10:3000 || true
+
 
 volumes:
 - name: shared_memory
@@ -85,7 +90,8 @@ volumes:
 
 services:
 - name: firefox
-  image: 192.168.0.11:5000/nemonik/standalone-firefox:3.141
+  image: 192.168.0.201:5000/nemonik/standalone-firefox:3.141
   volumes:
   - name: shared_memory
     path: /dev/shm
+
